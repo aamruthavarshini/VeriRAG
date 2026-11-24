@@ -1,0 +1,7 @@
+Company: TechNova Solutions
+
+1. TechNova Solutions was founded in 2018.
+2. The company is headquartered in Bengaluru, India.
+3. Its annual revenue in 2024 was Rs. 35 crore.
+4. The company has 250 employees.
+5. Its primary product is an AI-powered analytics platform.

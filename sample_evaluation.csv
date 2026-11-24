@@ -1,0 +1,7 @@
+
+claim,evidence,gold_label
+"The company generated revenue of 35 crore","The company reported annual revenue of 35 crore",Supported
+"The company generated revenue of 50 crore","The company reported annual revenue of 35 crore",Contradicted
+"The company opened a new office","The report discusses revenue and profit but no office expansion",Unsupported
+"The company hired 100 employees","The company hired 100 employees during the financial year",Supported
+"The company reduced costs by 20 percent","Operating expenses increased by 20 percent",Contradicted
