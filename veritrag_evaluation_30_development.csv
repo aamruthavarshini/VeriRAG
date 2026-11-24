@@ -1,0 +1,31 @@
+claim,evidence,gold_label
+The company generated revenue of 35 crore,The company reported annual revenue of 35 crore,Supported
+The company generated revenue of 50 crore,The company reported annual revenue of 35 crore,Contradicted
+The company opened a new office,The report discusses revenue and profit but no office expansion,Unsupported
+The company hired 100 employees,The company hired 100 employees during the financial year,Supported
+The company reduced costs by 20 percent,Operating expenses increased by 20 percent,Contradicted
+The company is headquartered in Bengaluru,The company's headquarters are located in Bengaluru,Supported
+The product was launched in 2022,The product launch took place in 2022,Supported
+The organization has 250 employees,The organization reported a workforce of 250 employees,Supported
+The platform supports document uploads,Users can upload documents to the platform,Supported
+The company operates in India,The company conducts its operations in India,Supported
+The service is available to enterprise customers,Enterprise customers can access the service,Supported
+The report covers the 2024 financial year,This report presents results for the 2024 financial year,Supported
+The application uses a PostgreSQL database,Application data is stored in a PostgreSQL database,Supported
+The company is headquartered in Mumbai,The company is headquartered in Bengaluru,Contradicted
+The product was launched in 2023,The product was launched in 2021,Contradicted
+The organization has 300 employees,The organization reported a workforce of 250 employees,Contradicted
+The company reported a profit of 12 crore,The company reported a loss of 12 crore,Contradicted
+The platform supports PDF uploads,The platform accepts TXT files only and does not support PDF uploads,Contradicted
+The company operates in India,The company operates exclusively in Germany and has no operations in India,Contradicted
+The contract expires in December 2026,The contract expires in December 2025,Contradicted
+The system uses MySQL,The system uses PostgreSQL and does not use MySQL,Contradicted
+The company has offices across Europe,The document reports the company's annual revenue and employee count,Unsupported
+The CEO graduated from Oxford University,The report identifies the CEO but does not mention their education,Unsupported
+The product has one million active users,The document describes the product's features but gives no user statistics,Unsupported
+The company plans to acquire a competitor,The report discusses the company's current products and financial performance,Unsupported
+The organization received an ISO certification,The document describes the organization's services but does not discuss certifications,Unsupported
+The company reduced its carbon emissions last year,The report contains financial results and workforce information but no emissions data,Unsupported
+The application is available on iOS,The documentation explains the web application's login and reporting features,Unsupported
+The company has a research center in Singapore,The document mentions the Bengaluru headquarters but gives no information about research centers,Unsupported
+The company was founded by two engineers,The company profile gives its founding year but does not identify its founders,Unsupported

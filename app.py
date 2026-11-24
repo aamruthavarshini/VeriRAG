@@ -26,7 +26,9 @@ st.subheader(
 )
 
 st.caption(
-    "Detect unsupported claims, contradictions and citation problems in RAG-generated answers."
+    "Assess answer claims against retrieved passages, show evidence, and check whether "
+    "claim-level source markers match retrieved source passages. This is a research prototype, "
+    "not a guarantee of factual correctness."
 )
 
 
@@ -128,6 +130,9 @@ with tab1:
                     uploads
                 )
 
+                for file_error in extract_documents.last_errors:
+                    st.warning(file_error)
+
                 if not docs:
 
                     st.error(
@@ -184,12 +189,14 @@ with tab1:
                     k=top_k
                 )
 
-                answer = ollama.generate_answer(
-                    question,
-                    passages
-                )
-
-                st.session_state.answer = answer
+                try:
+                    answer = ollama.generate_answer(
+                        question,
+                        passages
+                    )
+                    st.session_state.answer = answer
+                except Exception as error:
+                    st.error(f"Could not generate an answer: {error}")
 
     if st.session_state.answer:
 
@@ -309,11 +316,38 @@ with tab2:
             int(unsupported)
         )
 
+        # Expose claim-level citation verification in both the table and details.
+        # The factual verdict and citation verdict are separate: a claim can be
+        # Supported while its supplied source/passage marker is incorrect.
+        citation_statuses = [
+            result.get("citation_status", "Not evaluated")
+            for result in results
+        ]
+        df["Citation Status"] = citation_statuses
+
+        citation_matches = sum(
+            status == "Citation matches retrieved evidence"
+            for status in citation_statuses
+        )
+        citation_mismatches = sum(
+            status == "Citation does not match retrieved evidence"
+            for status in citation_statuses
+        )
+        citation_missing = sum(
+            status == "No claim-level citation marker"
+            for status in citation_statuses
+        )
+
         st.dataframe(
             df,
             use_container_width=True,
             hide_index=True
         )
+
+        citation_col1, citation_col2, citation_col3 = st.columns(3)
+        citation_col1.metric("Citations matched", citation_matches)
+        citation_col2.metric("Citation mismatches", citation_mismatches)
+        citation_col3.metric("Claims without citation", citation_missing)
 
         for index, result in enumerate(
             results,
@@ -321,48 +355,63 @@ with tab2:
         ):
 
             with st.expander(
-                f"Claim {index}: {result['status']}"
+                f"Claim {index}: {result.get('status', 'Unknown')}"
             ):
 
                 st.write(
                     "**Claim:**",
-                    result["claim"]
+                    result.get("claim", "")
                 )
 
                 st.write(
                     "**Explanation:**",
-                    result["explanation"]
+                    result.get("explanation", "")
                 )
 
                 st.write(
-                    "**Confidence:**",
-                    round(result["confidence"], 3)
+                    "**NLI confidence:**",
+                    round(float(result.get("confidence", 0.0)), 3)
+                )
+
+                st.write(
+                    "**Decision method:**",
+                    result.get("decision_method", "NLI")
                 )
 
                 st.write(
                     "**Similarity:**",
-                    round(result["similarity"], 3)
+                    round(float(result.get("similarity", 0.0)), 3)
                 )
 
                 st.write(
                     "**Numerical check:**",
-                    result["numeric_check"]
+                    result.get("numeric_check", "Not evaluated")
                 )
 
-                st.write(
-                    "**Evidence:**"
+                citation_status = result.get(
+                    "citation_status",
+                    "Not evaluated"
                 )
+                if citation_status == "Citation matches retrieved evidence":
+                    st.success(f"Citation status: {citation_status}")
+                elif citation_status == "Citation does not match retrieved evidence":
+                    st.error(f"Citation status: {citation_status}")
+                elif citation_status == "No claim-level citation marker":
+                    st.warning(f"Citation status: {citation_status}")
+                else:
+                    st.info(f"Citation status: {citation_status}")
 
-                for evidence in result["evidence"]:
+                if result.get("error"):
+                    st.error(f"Verification error: {result['error']}")
 
+                st.write("**Evidence:**")
+
+                for evidence in result.get("evidence", []):
                     st.markdown(
-                        f"**{evidence['source']} — "
-                        f"Passage {evidence['chunk_id']}**"
+                        f"**{evidence.get('source', 'Unknown source')} — "
+                        f"Passage {evidence.get('chunk_id', 'Unknown')}**"
                     )
-
-                    st.write(
-                        evidence["text"]
-                    )
+                    st.write(evidence.get("text", ""))
 
         st.download_button(
             "Download CSV Report",
@@ -388,9 +437,11 @@ with tab3:
 
     if file:
 
-        evaluation_data = pd.read_csv(
-            file
-        )
+        try:
+            evaluation_data = pd.read_csv(file)
+        except Exception as error:
+            st.error(f"Could not read the evaluation CSV: {error}")
+            evaluation_data = None
 
         required = {
             "claim",
@@ -398,7 +449,10 @@ with tab3:
             "gold_label"
         }
 
-        if not required.issubset(
+        if evaluation_data is None:
+            pass
+
+        elif not required.issubset(
             evaluation_data.columns
         ):
 
@@ -417,54 +471,90 @@ with tab3:
             )
 
             predictions = []
+            evaluation_rows = []
 
-            with st.spinner(
-                "Evaluating examples..."
-            ):
+            with st.spinner("Evaluating examples..."):
+                for row_index, row in evaluation_data.iterrows():
+                    try:
+                        if pd.isna(row["claim"]) or pd.isna(row["evidence"]):
+                            raise ValueError("Claim and evidence must not be empty.")
+                        result = verifier.classify_pair(
+                            str(row["claim"]),
+                            str(row["evidence"])
+                        )
+                        prediction = result["status"]
+                        error_message = ""
+                    except Exception as error:
+                        prediction = "Verification Error"
+                        error_message = str(error)
 
-                for _, row in evaluation_data.iterrows():
+                    predictions.append(prediction)
+                    evaluation_rows.append({
+                        "Claim": str(row["claim"]),
+                        "Gold Label": str(row["gold_label"]).strip(),
+                        "Predicted Label": prediction,
+                        "Error": error_message
+                    })
 
-                    result = verifier.classify_pair(
-                        str(row["claim"]),
-                        str(row["evidence"])
+            metrics = None
+            valid_indices = [
+                i for i, prediction in enumerate(predictions)
+                if prediction in {"Supported", "Contradicted", "Unsupported"}
+            ]
+            if not valid_indices:
+                st.error("No examples were successfully classified.")
+            else:
+                y_true = [
+                    str(evaluation_data.iloc[i]["gold_label"]).strip()
+                    for i in valid_indices
+                ]
+                y_pred = [predictions[i] for i in valid_indices]
+
+                try:
+                    metrics = calculate_metrics(y_true, y_pred)
+                except ValueError as error:
+                    st.error(f"Evaluation labels are invalid: {error}")
+                    metrics = None
+
+                if metrics is not None:
+                    st.metric(
+                        "Accuracy (successful rows)",
+                        f"{metrics['accuracy']:.3f}"
+                    )
+                    st.metric(
+                        "Macro F1",
+                        f"{metrics['macro_f1']:.3f}"
+                    )
+                    st.caption(
+                        f"Successfully classified {len(valid_indices)} of "
+                        f"{len(evaluation_data)} rows. Errors are excluded from metrics."
                     )
 
-                    predictions.append(
-                        result["status"]
-                    )
+            if metrics is not None:
+                st.subheader("Class-wise Performance")
+                st.dataframe(
+                    pd.DataFrame(metrics["per_class"]).T,
+                    use_container_width=True
+                )
 
-            metrics = calculate_metrics(
-                evaluation_data["gold_label"].astype(str).tolist(),
-                predictions
-            )
+                st.subheader("Confusion Matrix")
+                st.dataframe(
+                    pd.DataFrame(
+                        metrics["confusion_matrix"],
+                        index=metrics["labels"],
+                        columns=metrics["labels"]
+                    ),
+                    use_container_width=True
+                )
 
-            st.metric(
-                "Accuracy",
-                f"{metrics['accuracy']:.3f}"
-            )
-
-            st.subheader(
-                "Class-wise Performance"
-            )
-
-            st.dataframe(
-                pd.DataFrame(
-                    metrics["per_class"]
-                ).T,
-                use_container_width=True
-            )
-
-            st.subheader(
-                "Confusion Matrix"
-            )
-
-            st.dataframe(
-                pd.DataFrame(
-                    metrics["confusion_matrix"],
-                    index=metrics["labels"],
-                    columns=metrics["labels"]
-                ),
-                use_container_width=True
+            st.subheader("Per-example results")
+            evaluation_report = pd.DataFrame(evaluation_rows)
+            st.dataframe(evaluation_report, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Download evaluation results",
+                evaluation_report.to_csv(index=False),
+                "veritrag_evaluation_results.csv",
+                "text/csv"
             )
 
 
